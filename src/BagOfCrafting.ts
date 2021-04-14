@@ -22,7 +22,7 @@ export class BagOfCrafting {
 
         components = _.orderBy(components, e => e);
 
-        let hardcoded = BagOfCrafting.HardCodedRecipes.get(components.toString());
+        let hardcoded = BagOfCrafting.JsIncorrectRecipes.get(components.toString());
         if (hardcoded != null)
             return hardcoded;
 
@@ -226,7 +226,10 @@ export class BagOfCrafting {
         0x00000002
     ];
 
-    static readonly HardCodedRecipes = new Map<string, number>([
+    /**
+     * These are recipes that JS gets wrong due to rounding differences between single and double floating precision.
+     */
+    static readonly JsIncorrectRecipes = new Map<string, number>([
         [([1, 2, 3, 6, 13, 18, 24, 24]).toString(), 161],
         [([7, 8, 13, 17, 21, 22, 23, 24]).toString(), 218],
         [([1, 1, 5, 7, 11, 14, 19, 19]).toString(), 225],
