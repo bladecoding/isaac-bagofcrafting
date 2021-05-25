@@ -2,6 +2,8 @@ import _ = require('lodash');
 import { ItemPool, ItemQualities } from './Isaac';
 import { Rng } from './Rng';
 
+type MatCollection = { [index: string]: number }
+
 export class BagOfCrafting {
 
     private pools: ItemPool[];
@@ -113,6 +115,83 @@ export class BagOfCrafting {
         }
 
         return 25;
+    }
+
+    /*
+     Generates all possible recipes (unique combinations of 8 components) from a given arbitrary sized list of components. Then uses
+     BagOfCrafting.calculate() to obtain the id of each created item. Returns a mapping of item id to component list.
+    */
+    calculateAllRecipes(components: number[]): { [index: number]: number[] } {
+        let toMatCollection = (m: number[]) => {
+            let x: MatCollection = {};
+            for (let s of m) {
+                if (s in x) x[s] += 1;
+                else x[s] = 1;
+            }
+            return x
+        };
+
+        let toNumArr = (m: MatCollection) => {
+            let ans = [];
+            for (let n of Object.keys(m)) {
+                for (let i = 0; i < m[n]; i++)
+                    ans.push(parseInt(n))
+            }
+            return ans;
+        };
+
+        let recipeArr: number[][] = this._getPartialRecipe(toMatCollection(components), 8).map(toNumArr);
+
+        let ans: { [index: number]: number[] } = {};
+        for (let r of recipeArr) {
+            let item: number = this.calculate(r);
+            ans[item] = r;
+        }
+
+        return ans
+    }
+
+    _getPartialRecipe(mats: MatCollection, remaining: number): MatCollection[] {
+        let matKeys: string[] = Object.keys(mats);
+        let curr: string = matKeys[0];
+
+        if (matKeys.length == 0 || remaining == 0) return [];
+
+        let totalMats = _.reduce(mats, (r, v) => r + v, 0);
+        if (totalMats < remaining) return []; // if fewer mats than requested then can't make anything
+        if (totalMats == remaining) return [mats]; // if exact number of mats then we know we can only make one thing so can return early
+
+        // if we only have one type of material, then all we can do is return <remaining> counts of that mat.
+        if (matKeys.length == 1) {
+            let ans: MatCollection = {};
+            ans[curr] = remaining;
+            return [ans];
+        }
+
+        let ans: MatCollection[] = [];
+        for (let i = mats[curr]; i >= 0; i--) {
+            if (i >= remaining) {// I really feel like there should be a more compact way to write this but I don't know TypeScript very well
+                let a: MatCollection = {};
+                a[curr] = remaining;
+                ans.push(a);
+                i = remaining;
+                continue;
+            }
+
+            // get all possible completions of the recipe if we used i of the current mat
+            let partials = this._getPartialRecipe(_.pick(mats, _.tail(matKeys)), remaining - i);
+            if (partials === []) break; // couldn't make anything using only i of the current mat, so won't be able to make anything with even fewer
+
+            if (i == 0) ans.push(...partials);
+            else {
+                for (let p of partials) {
+                    p[curr] = i;
+                    ans.push(p)
+                }
+            }
+        }
+
+        return ans;
     }
 
     static readonly ComponentShifts: [number, number, number][] = [
