@@ -1,7 +1,8 @@
 import _ = require('lodash');
-import { ItemPool, ItemQualities } from './Isaac';
-import { Rng } from './Rng';
+import {ItemPool, ItemQualities} from './Isaac';
+import {Rng} from './Rng';
 
+// dictionary of component id (stored as a string) to amount of that component
 type MatCollection = { [index: string]: number }
 
 export class BagOfCrafting {
@@ -40,19 +41,19 @@ export class BagOfCrafting {
         rng.shift = BagOfCrafting.ComponentShifts[6];
 
         let poolWeights = [
-            { idx: 0, weight: 1 },
-            { idx: 1, weight: 2 },
-            { idx: 2, weight: 2 },
-            { idx: 4, weight: compCounts[4] * 10 },
-            { idx: 3, weight: compCounts[3] * 10 },
-            { idx: 5, weight: compCounts[6] * 5 },
-            { idx: 8, weight: compCounts[5] * 10 },
-            { idx: 12, weight: compCounts[7] * 10 },
-            { idx: 9, weight: compCounts[25] * 10 },
+            {idx: 0, weight: 1},
+            {idx: 1, weight: 2},
+            {idx: 2, weight: 2},
+            {idx: 4, weight: compCounts[4] * 10},
+            {idx: 3, weight: compCounts[3] * 10},
+            {idx: 5, weight: compCounts[6] * 5},
+            {idx: 8, weight: compCounts[5] * 10},
+            {idx: 12, weight: compCounts[7] * 10},
+            {idx: 9, weight: compCounts[25] * 10},
         ];
 
         if (compCounts[8] + compCounts[1] + compCounts[12] + compCounts[15] == 0)
-            poolWeights.push({ idx: 26, weight: compCounts[23] * 10 });
+            poolWeights.push({idx: 26, weight: compCounts[23] * 10});
 
         let totalWeight = 0;
         let itemWeights: number[] = new Array(this.maxItemId + 1).fill(0);
@@ -117,41 +118,46 @@ export class BagOfCrafting {
         return 25;
     }
 
-    /*
+    /**
      Generates all possible recipes (unique combinations of 8 components) from a given arbitrary sized list of components. Then uses
      BagOfCrafting.calculate() to obtain the id of each created item. Returns a mapping of item id to component list.
-    */
-    calculateAllRecipes(components: number[]): { [index: number]: number[] } {
-        let toMatCollection = (m: number[]) => {
-            let x: MatCollection = {};
-            for (let s of m) {
-                if (s in x) x[s] += 1;
-                else x[s] = 1;
+     */
+    calculateAllRecipes(components: number[]): Map<number, number[]> {
+
+        // count how many of each component we have
+        let toMatCollection = (matArr: number[]) => {
+            let ans: MatCollection = {};
+            for (let i of matArr) {
+                if (i in ans) ans[i] += 1;
+                else ans[i] = 1;
             }
-            return x
+            return ans
         };
 
-        let toNumArr = (m: MatCollection) => {
+        // convert back to component array for giving to calculate()
+        let toNumArr = (matCol: MatCollection) => {
             let ans = [];
-            for (let n of Object.keys(m)) {
-                for (let i = 0; i < m[n]; i++)
-                    ans.push(parseInt(n))
+            for (let mat of Object.keys(matCol)) {
+                for (let i = 0; i < matCol[mat]; i++)
+                    ans.push(parseInt(mat))
             }
             return ans;
         };
 
+        // get all possible unique combinations of length 8
         let recipeArr: number[][] = this._getPartialRecipe(toMatCollection(components), 8).map(toNumArr);
 
-        let ans: { [index: number]: number[] } = {};
+        // call calculate() on each recipe
+        let ans = new Map<number, number[]>();
         for (let r of recipeArr) {
-            let item: number = this.calculate(r);
-            ans[item] = r;
+            let itemId: number = this.calculate(r);
+            ans.set(itemId, r);
         }
 
         return ans
     }
 
-    _getPartialRecipe(mats: MatCollection, remaining: number): MatCollection[] {
+    private _getPartialRecipe(mats: MatCollection, remaining: number): MatCollection[] {
         let matKeys: string[] = Object.keys(mats);
         let curr: string = matKeys[0];
 
@@ -161,7 +167,8 @@ export class BagOfCrafting {
         if (totalMats < remaining) return []; // if fewer mats than requested then can't make anything
         if (totalMats == remaining) return [mats]; // if exact number of mats then we know we can only make one thing so can return early
 
-        // if we only have one type of material, then all we can do is return <remaining> counts of that mat.
+        // if we only have one type of mat then all we can do is return <remaining> counts of that mat.
+        // if mats[curr] < remaining we would have returned already so this is ok to do
         if (matKeys.length == 1) {
             let ans: MatCollection = {};
             ans[curr] = remaining;
@@ -170,8 +177,11 @@ export class BagOfCrafting {
 
         let ans: MatCollection[] = [];
         for (let i = mats[curr]; i >= 0; i--) {
-            if (i >= remaining) {// I really feel like there should be a more compact way to write this but I don't know TypeScript very well
-                let a: MatCollection = {};
+
+            // if we have more of the current component than there are missing components, then we should only add the recipe that uses <remaining> of that
+            // component, then continue at i=remaining-1
+            if (i >= remaining) {
+                let a: MatCollection = {}; // this is kinda gross, fix?
                 a[curr] = remaining;
                 ans.push(a);
                 i = remaining;
@@ -182,6 +192,7 @@ export class BagOfCrafting {
             let partials = this._getPartialRecipe(_.pick(mats, _.tail(matKeys)), remaining - i);
             if (partials === []) break; // couldn't make anything using only i of the current mat, so won't be able to make anything with even fewer
 
+            // add the recipe to the returned list. if we didn't use the current component in this iteration, don't add it to the recipe
             if (i == 0) ans.push(...partials);
             else {
                 for (let p of partials) {
