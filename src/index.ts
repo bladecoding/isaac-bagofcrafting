@@ -11,7 +11,7 @@ let bc = new BagOfCrafting(pools, meta);
 // throw new Error();
 
 // 'aaaaaaaa' to [1,1,1,1,1,1,1,1]
-let asciiToNum = (s: string) => s.split('').map(c => c.charCodeAt(0) - 0x61);
+let asciiToNum = (s: string) => s.split('').map(c => c.charCodeAt(0) - 0x61 + 1);
 
 for (let file of fs.readdirSync('F:/bag_of_crafting_recipes')) {
     let id = Number(file.substr(0, file.lastIndexOf('.')));
